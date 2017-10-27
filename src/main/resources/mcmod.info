@@ -1,0 +1,18 @@
+[
+{
+  "modid": "bg",
+  "name": "Building Guide",
+  "description": "Learn how to create absolutely anything.",
+  "version": "${version}",
+  "mcversion": "${mcversion}",
+  "url": "",
+  "updateUrl": "",
+  "authorList": ["CJMinecraft"],
+  "credits": "The amazing subscribers who have helped support this project",
+  "logoFile": "",
+  "screenshots": [],
+  "useDependencyInformation": true,
+  "requiredMods": ["cjcore"],
+  "dependencies": ["cjcore"]
+}
+]
