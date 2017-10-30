@@ -2,6 +2,7 @@ package cjminecraft.building.guide.items;
 
 import cjminecraft.building.guide.BuildingGuide;
 import cjminecraft.building.guide.Reference;
+import cjminecraft.building.guide.client.gui.GuiHandler;
 import cjminecraft.building.guide.structure.Structure;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.Item;
@@ -25,33 +26,34 @@ public class ItemBuildingGuide extends Item {
 
 	@Override
 	public ActionResult<ItemStack> onItemRightClick(World world, EntityPlayer player, EnumHand hand) {
-		// player.openGui(BuildingGuide.instance, GuiHandler.BUILDING_GUIDE,
-		// world, player.getPosition().getX(),
-		// player.getPosition().getY(), player.getPosition().getZ());
+		if(player.isSneaking() && player.getHeldItem(hand).hasTagCompound()) {
+			if(player.getHeldItem(hand).getTagCompound().hasKey("Structure"))
+				player.getHeldItem(hand).getTagCompound().removeTag("Structure");
+			if(player.getHeldItem(hand).getTagCompound().hasKey("Pos"))
+				player.getHeldItem(hand).getTagCompound().removeTag("Pos");
+		}
+		if (player.getHeldItem(hand).hasTagCompound() && player.getHeldItem(hand).getTagCompound().hasKey("Structure"))
+			player.openGui(BuildingGuide.instance, GuiHandler.BUILDING_GUIDE, world, player.getPosition().getX(),
+					player.getPosition().getY(), player.getPosition().getZ());
 		return super.onItemRightClick(world, player, hand);
 	}
 
 	@Override
 	public EnumActionResult onItemUseFirst(EntityPlayer player, World world, BlockPos pos, EnumFacing side, float hitX,
 			float hitY, float hitZ, EnumHand hand) {
-		if (player.getHeldItem(hand).hasTagCompound()) {
-			if (player.getHeldItem(hand).getTagCompound().hasKey("Structure")) {
-				Structure s = new Structure(player.getHeldItem(hand).getTagCompound().getCompoundTag("Structure"));
-				if(side.getAxis() == EnumFacing.Axis.Y)
-					return super.onItemUseFirst(player, world, pos, side, hitX, hitY, hitZ, hand);
-				s.placeBlocks(world, pos, side.getOpposite());
-				player.getHeldItem(hand).getTagCompound().removeTag("Structure");
-			}
-			else if (player.getHeldItem(hand).getTagCompound().hasKey("Pos")) {
-				Structure s = new Structure(NBTUtil.getPosFromTag(player.getHeldItem(hand).getTagCompound().getCompoundTag("Pos")), pos);
-				s.loadBlocks(world);
-				player.getHeldItem(hand).getTagCompound().removeTag("Pos");
-				player.getHeldItem(hand).getTagCompound().setTag("Structure", s.serializeNBT());
-			} else {
-				player.getHeldItem(hand).getTagCompound().setTag("Pos", NBTUtil.createPosTag(pos));
-			}
-		} else {
+		if (!player.getHeldItem(hand).hasTagCompound()) {
 			player.getHeldItem(hand).setTagCompound(new NBTTagCompound());
+		}
+		if(player.getHeldItem(hand).getTagCompound().hasKey("Structure"))
+			return super.onItemUseFirst(player, world, pos, side, hitX, hitY, hitZ, hand);
+		if (player.getHeldItem(hand).getTagCompound().hasKey("Pos")) {
+			Structure s = new Structure(
+					NBTUtil.getPosFromTag(player.getHeldItem(hand).getTagCompound().getCompoundTag("Pos")), pos);
+			s.loadBlocks(world);
+			player.getHeldItem(hand).getTagCompound().removeTag("Pos");
+			player.getHeldItem(hand).getTagCompound().setTag("Structure", s.serializeNBT());
+		} else {
+			player.getHeldItem(hand).getTagCompound().setTag("Pos", NBTUtil.createPosTag(pos));
 		}
 		return super.onItemUseFirst(player, world, pos, side, hitX, hitY, hitZ, hand);
 	}

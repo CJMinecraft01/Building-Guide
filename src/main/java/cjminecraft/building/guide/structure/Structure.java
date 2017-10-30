@@ -1,26 +1,30 @@
 package cjminecraft.building.guide.structure;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import com.google.common.collect.Lists;
 
+import cjminecraft.building.guide.BuildingGuide;
 import net.minecraft.block.state.IBlockState;
+import net.minecraft.init.Blocks;
+import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.nbt.NBTUtil;
+import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.Rotation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3i;
+import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
-import net.minecraftforge.client.model.BlockStateLoader;
+import net.minecraft.world.WorldType;
+import net.minecraft.world.biome.Biome;
 import net.minecraftforge.common.util.INBTSerializable;
-import net.minecraftforge.fml.common.FMLCommonHandler;
 
-public class Structure implements INBTSerializable<NBTTagCompound> {
+public class Structure implements INBTSerializable<NBTTagCompound>, IBlockAccess {
 
-	private List<BlockInfo> blocks = Lists.<BlockInfo>newArrayList();
+	private IBlockState[][][] blocks;
 	private int minX, minY, minZ;
 	private int maxX, maxY, maxZ;
 	private int sizeX, sizeY, sizeZ;
@@ -49,7 +53,7 @@ public class Structure implements INBTSerializable<NBTTagCompound> {
 		calculateSize();
 	}
 
-	public Structure(int sizeX, int sizeY, int sizeZ, List<BlockInfo> blocks) {
+	public Structure(int sizeX, int sizeY, int sizeZ, IBlockState[][][] blocks) {
 		this.sizeX = sizeX;
 		this.sizeY = sizeY;
 		this.sizeZ = sizeZ;
@@ -60,16 +64,15 @@ public class Structure implements INBTSerializable<NBTTagCompound> {
 		this.sizeX = Math.abs(this.maxX - this.minX + 1);
 		this.sizeY = Math.abs(this.maxY - this.minY + 1);
 		this.sizeZ = Math.abs(this.maxZ - this.minZ + 1);
+		this.blocks = new IBlockState[this.sizeY][this.sizeX][this.sizeZ];
 	}
 
-	public Structure loadBlocks(World world) {
-		this.blocks.clear();
+	public Structure loadBlocks(IBlockAccess world) {
 		for (int x = this.minX; x <= this.maxX; x++) {
 			for (int z = this.minZ; z <= this.maxZ; z++) {
 				for (int y = this.minY; y <= this.maxY; y++) {
-					BlockInfo block = new BlockInfo(new BlockPos(x - this.minX, y - this.minY, z - this.minZ),
-							world.getBlockState(new BlockPos(x, y, z)));
-					this.blocks.add(block);
+					//BuildingGuide.logger.info(x + " " + y + " " + z + " " + (x - this.minX) + " " + (y - this.minY) + " " + (z - this.minZ)); TODO remove
+					this.blocks[y - this.minY][x - this.minX][z - this.minZ] = world.getBlockState(new BlockPos(x, y, z));
 				}
 			}
 		}
@@ -79,20 +82,28 @@ public class Structure implements INBTSerializable<NBTTagCompound> {
 	public Structure placeBlocks(World world, BlockPos pos, EnumFacing orientation) {
 		switch (orientation) {
 		case EAST:
-			for (BlockInfo block : this.blocks)
-				world.setBlockState(pos.add(block.pos.rotate(Rotation.CLOCKWISE_90)).east(), block.state);
+			for(int y = 0; y < this.sizeY; y++)
+				for(int x = 0; x < this.sizeX; x++)
+					for(int z = 0; z < this.sizeZ; z++)
+						world.setBlockState(pos.add(x, y, z).rotate(Rotation.CLOCKWISE_90).east(), this.blocks[y][x][z]);
 			break;
 		case NORTH:
-			for (BlockInfo block : this.blocks)
-				world.setBlockState(pos.add(block.pos).north(), block.state);
+			for(int y = 0; y < this.sizeY; y++)
+				for(int x = 0; x < this.sizeX; x++)
+					for(int z = 0; z < this.sizeZ; z++)
+						world.setBlockState(pos.add(x, y, z).north(), this.blocks[y][x][z]);
 			break;
 		case SOUTH:
-			for (BlockInfo block : this.blocks)
-				world.setBlockState(pos.add(block.pos.rotate(Rotation.CLOCKWISE_180)).south(), block.state);
+			for(int y = 0; y < this.sizeY; y++)
+				for(int x = 0; x < this.sizeX; x++)
+					for(int z = 0; z < this.sizeZ; z++)
+						world.setBlockState(pos.add(x, y, z).rotate(Rotation.CLOCKWISE_180).south(), this.blocks[y][x][z]);
 			break;
 		case WEST:
-			for (BlockInfo block : this.blocks)
-				world.setBlockState(pos.add(block.pos.rotate(Rotation.COUNTERCLOCKWISE_90)).west(), block.state);
+			for(int y = 0; y < this.sizeY; y++)
+				for(int x = 0; x < this.sizeX; x++)
+					for(int z = 0; z < this.sizeZ; z++)
+						world.setBlockState(pos.add(x, y, z).rotate(Rotation.COUNTERCLOCKWISE_90).west(), this.blocks[y][x][z]);
 			break;
 		default:
 			return this;
@@ -105,9 +116,18 @@ public class Structure implements INBTSerializable<NBTTagCompound> {
 		NBTTagCompound nbt = new NBTTagCompound();
 		nbt.setIntArray("Size", new int[] { this.sizeX, this.sizeY, this.sizeZ });
 		NBTTagList list = new NBTTagList();
-		this.blocks.forEach(block -> {
-			list.appendTag(block.serializeNBT());
-		});
+		for(int y = 0; y < this.sizeY; y++) {
+			for(int x = 0; x < this.sizeX; x++) {
+				for(int z = 0; z < this.sizeZ; z++) {
+					NBTTagCompound block = new NBTTagCompound();
+					block.setTag("Pos", NBTUtil.createPosTag(new BlockPos(x, y, z)));
+					NBTTagCompound stateTag = new NBTTagCompound();
+					NBTUtil.writeBlockState(stateTag, this.blocks[y][x][z]);
+					block.setTag("State", stateTag);
+					list.appendTag(block);
+				}
+			}
+		}
 		nbt.setTag("Blocks", list);
 		return nbt;
 	}
@@ -118,42 +138,68 @@ public class Structure implements INBTSerializable<NBTTagCompound> {
 		this.sizeX = size[0];
 		this.sizeY = size[1];
 		this.sizeZ = size[2];
+		this.blocks = new IBlockState[this.sizeY][this.sizeX][this.sizeZ];
 		NBTTagList list = nbt.getTagList("Blocks", 10);
-		List<BlockInfo> blocks = Lists.<BlockInfo>newArrayList();
 		list.forEach(blockTag -> {
-			blocks.add(new BlockInfo((NBTTagCompound) blockTag));
+			BlockPos pos = NBTUtil.getPosFromTag(((NBTTagCompound) blockTag).getCompoundTag("Pos"));
+			this.blocks[pos.getY()][pos.getX()][pos.getZ()] = NBTUtil.readBlockState(((NBTTagCompound) blockTag).getCompoundTag("State"));
 		});
-		this.blocks = blocks;
+	}
+	
+	public int getSizeX() {
+		return sizeX;
+	}
+	
+	public int getSizeY() {
+		return sizeY;
+	}
+	
+	public int getSizeZ() {
+		return sizeZ;
 	}
 
-	public static class BlockInfo implements INBTSerializable<NBTTagCompound> {
-		public BlockPos pos;
-		public IBlockState state;
+	@Override
+	public TileEntity getTileEntity(BlockPos pos) {
+		return null;
+	}
 
-		public BlockInfo(NBTTagCompound nbt) {
-			deserializeNBT(nbt);
-		}
-		
-		public BlockInfo(BlockPos pos, IBlockState state) {
-			this.pos = pos;
-			this.state = state;
-		}
+	@Override
+	public int getCombinedLight(BlockPos pos, int lightValue) {
+		return 15 << 20 | 15 << 4;
+	}
 
-		@Override
-		public NBTTagCompound serializeNBT() {
-			NBTTagCompound nbt = new NBTTagCompound();
-			nbt.setTag("Pos", NBTUtil.createPosTag(this.pos));
-			NBTTagCompound stateTag = new NBTTagCompound();
-			NBTUtil.writeBlockState(stateTag, this.state);
-			nbt.setTag("State", stateTag);
-			return nbt;
-		}
+	@Override
+	public IBlockState getBlockState(BlockPos pos) {
+		if(pos.getY() >= 0 && pos.getY() < this.blocks.length)
+			if(pos.getX() >= 0 && pos.getX() < this.blocks[pos.getY()].length)
+				if(pos.getZ() >= 0 && pos.getZ() < this.blocks[pos.getY()][pos.getX()].length)
+					return this.blocks[pos.getY()][pos.getX()][pos.getZ()];
+		return Blocks.AIR.getDefaultState();
+	}
 
-		@Override
-		public void deserializeNBT(NBTTagCompound nbt) {
-			this.pos = NBTUtil.getPosFromTag(nbt.getCompoundTag("Pos"));
-			this.state = NBTUtil.readBlockState(nbt.getCompoundTag("State"));
-		}
+	@Override
+	public boolean isAirBlock(BlockPos pos) {
+		return getBlockState(pos).getBlock() == Blocks.AIR;
+	}
+
+	@Override
+	public Biome getBiome(BlockPos pos) {
+		return null;
+	}
+
+	@Override
+	public int getStrongPower(BlockPos pos, EnumFacing direction) {
+		return 0;
+	}
+
+	@Override
+	public WorldType getWorldType() {
+		return null;
+	}
+
+	@Override
+	public boolean isSideSolid(BlockPos pos, EnumFacing side, boolean _default) {
+		return false;
 	}
 
 }
